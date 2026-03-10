@@ -85,10 +85,37 @@ db.exec(`
     FOREIGN KEY (invoice_id) REFERENCES invoices(id)
   );
 
+  CREATE TABLE IF NOT EXISTS services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    base_price REAL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS company_service_prices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_id INTEGER NOT NULL,
+    service_id INTEGER NOT NULL,
+    price REAL NOT NULL,
+    UNIQUE(company_id, service_id),
+    FOREIGN KEY (company_id) REFERENCES companies(id),
+    FOREIGN KEY (service_id) REFERENCES services(id)
+  );
+
   -- Seed Data
+  INSERT OR IGNORE INTO services (id, name, description, base_price) VALUES 
+  (1, 'علاج طبيعي', 'Physiotherapy sessions', 150),
+  (2, 'زيارة ممرضة', 'Nurse home visit', 100),
+  (3, 'زيارة طبيب', 'Doctor home visit', 300),
+  (4, 'مقدم رعاية', 'Caregiver services', 80);
+
   INSERT OR IGNORE INTO companies (id, name, contact_person, phone, email, billing_method) VALUES 
-  (1, 'شركة إشفاء', 'أحمد علي', '0501234567', 'ishfaa@example.com', 'monthly'),
-  (2, 'مجمع الطبيب', 'سارة خالد', '0559876543', 'doctor@example.com', 'completed');
+  (1, 'ذات قروب - That Group', 'المسؤول', '0500000001', 'thatgroup@example.com', 'monthly'),
+  (2, 'إشفاء - Ishfaa', 'المسؤول', '0500000002', 'ishfaa@example.com', 'monthly'),
+  (3, 'حكيم كير - Hakeem Care', 'المسؤول', '0500000003', 'hakeemcare@example.com', 'monthly'),
+  (4, 'نرعاكم - Naraakum', 'المسؤول', '0500000004', 'naraakum@example.com', 'monthly'),
+  (5, 'وتد - Watad', 'المسؤول', '0500000005', 'watad@example.com', 'monthly');
 
   INSERT OR IGNORE INTO therapists (id, name, specialty, phone) VALUES 
   (1, 'د. فهد الشمري', 'علاج طبيعي', '0560001111'),
@@ -96,7 +123,7 @@ db.exec(`
 
   INSERT OR IGNORE INTO patients (id, company_id, therapist_id, name, service_type, total_sessions, price_per_session, start_date) VALUES 
   (1, 1, 1, 'محمد العتيبي', 'علاج طبيعي', 12, 150, '2024-03-01'),
-  (2, 2, 2, 'فهد السبيعي', 'تمريض منزلي', 10, 100, '2024-03-05');
+  (2, 2, 2, 'فهد السبيعي', 'زيارة ممرضة', 10, 100, '2024-03-05');
 
   INSERT OR IGNORE INTO sessions (id, patient_id, therapist_id, session_date, session_number, status) VALUES 
   (1, 1, 1, '2024-03-02', 1, 'completed'),
@@ -116,7 +143,55 @@ async function startServer() {
 
   // --- API Routes ---
 
-  // Dashboard Stats
+  // Services API
+  app.get("/api/services", (req, res) => {
+    const services = db.prepare("SELECT * FROM services ORDER BY name ASC").all();
+    res.json(services);
+  });
+
+  app.post("/api/services", (req, res) => {
+    const { name, description, base_price } = req.body;
+    try {
+      const result = db.prepare("INSERT INTO services (name, description, base_price) VALUES (?, ?, ?)").run(name, description, base_price);
+      res.json({ id: result.lastInsertRowid });
+    } catch (e) {
+      res.status(400).json({ error: "Service name must be unique" });
+    }
+  });
+
+  app.put("/api/services/:id", (req, res) => {
+    const { name, description, base_price } = req.body;
+    db.prepare("UPDATE services SET name = ?, description = ?, base_price = ? WHERE id = ?").run(name, description, base_price, req.params.id);
+    res.json({ success: true });
+  });
+
+  app.delete("/api/services/:id", (req, res) => {
+    db.prepare("DELETE FROM services WHERE id = ?").run(req.params.id);
+    res.json({ success: true });
+  });
+
+// Company Service Prices API
+app.get("/api/company-prices/:companyId", (req, res) => {
+  const prices = db.prepare(`
+    SELECT csp.*, s.name as service_name 
+    FROM company_service_prices csp
+    JOIN services s ON csp.service_id = s.id
+    WHERE csp.company_id = ?
+  `).all(req.params.companyId);
+  res.json(prices);
+});
+
+app.post("/api/company-prices", (req, res) => {
+  const { company_id, service_id, price } = req.body;
+  db.prepare(`
+    INSERT INTO company_service_prices (company_id, service_id, price) 
+    VALUES (?, ?, ?)
+    ON CONFLICT(company_id, service_id) DO UPDATE SET price = excluded.price
+  `).run(company_id, service_id, price);
+  res.json({ success: true });
+});
+
+// Dashboard Stats
   app.get("/api/stats", (req, res) => {
     const { company_id, month, year, service_type } = req.query;
     let sessionFilter = "WHERE status = 'completed'";

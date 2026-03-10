@@ -59,7 +59,7 @@ function cn(...inputs: ClassValue[]) {
 
 // --- Types ---
 type Language = 'ar' | 'en';
-type Tab = 'dashboard' | 'companies' | 'patients' | 'therapists' | 'sessions' | 'invoices' | 'reports' | 'calendar' | 'settings' | 'notifications';
+type Tab = 'dashboard' | 'companies' | 'patients' | 'therapists' | 'sessions' | 'invoices' | 'reports' | 'calendar' | 'settings' | 'notifications' | 'services';
 
 interface Translation {
   [key: string]: {
@@ -168,9 +168,9 @@ const translations: Translation = {
   sessionDate: { ar: 'تاريخ الجلسة', en: 'Session Date' },
   amountPaid: { ar: 'المبلغ المدفوع', en: 'Amount Paid' },
   physiotherapy: { ar: 'علاج طبيعي', en: 'Physiotherapy' },
-  nursing: { ar: 'تمريض منزلي', en: 'Nursing' },
+  nurseVisit: { ar: 'زيارة ممرضة', en: 'Nurse Visit' },
   doctorVisit: { ar: 'زيارة طبيب', en: 'Doctor Visit' },
-  ivTherapy: { ar: 'علاج وريدي', en: 'IV Therapy' },
+  caregiver: { ar: 'مقدم رعاية', en: 'Caregiver' },
   others: { ar: 'أخرى', en: 'Others' },
   billingMethod: { ar: 'طريقة الفوترة', en: 'Billing Method' },
   assignedTherapist: { ar: 'المعالج المسؤول', en: 'Assigned Therapist' },
@@ -198,6 +198,14 @@ const translations: Translation = {
   thuShort: { ar: 'خميس', en: 'Thu' },
   friShort: { ar: 'جمعة', en: 'Fri' },
   satShort: { ar: 'سبت', en: 'Sat' },
+  services: { ar: 'الخدمات', en: 'Services' },
+  addService: { ar: 'إضافة خدمة', en: 'Add Service' },
+  serviceName: { ar: 'اسم الخدمة', en: 'Service Name' },
+  description: { ar: 'الوصف', en: 'Description' },
+  basePrice: { ar: 'السعر الأساسي', en: 'Base Price' },
+  companyPrices: { ar: 'أسعار الخدمات للشركة', en: 'Company Service Prices' },
+  setPrice: { ar: 'تحديد السعر', en: 'Set Price' },
+  price: { ar: 'السعر', en: 'Price' },
 };
 
 // --- Main App Component ---
@@ -211,6 +219,8 @@ export default function App() {
   const [therapists, setTherapists] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [companyPrices, setCompanyPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any>(null);
@@ -228,6 +238,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState<any>({});
+  const [showCompanyPrices, setShowCompanyPrices] = useState<number | null>(null);
 
   const [notifications, setNotifications] = useState<any[]>([
     { id: 1, type: 'session', title: 'upcomingSession', desc: 'Ahmed Ali - 4:00 PM', time: '5m ago', read: false },
@@ -255,13 +266,32 @@ export default function App() {
     { name: isRtl ? 'مارس' : 'Mar', value: 67000 },
   ], [isRtl]);
 
-  const serviceDistribution = useMemo(() => [
-    { name: t('physiotherapy'), value: 45 },
-    { name: t('nursing'), value: 25 },
-    { name: t('doctorVisit'), value: 15 },
-    { name: t('ivTherapy'), value: 10 },
-    { name: t('others'), value: 5 },
-  ], [t]);
+  const uniqueServices = useMemo(() => {
+    const sSet = new Set<string>();
+    services.forEach(s => sSet.add(s.name));
+    patients.forEach(p => {
+      if (p.service_type) sSet.add(p.service_type);
+    });
+    return Array.from(sSet);
+  }, [services, patients]);
+
+  const serviceDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    patients.forEach(p => {
+      if (p.service_type) {
+        counts[p.service_type] = (counts[p.service_type] || 0) + 1;
+      }
+    });
+    const total = patients.length || 1;
+    return Object.entries(counts).map(([name, count]) => {
+      const translationKey = Object.keys(translations).find(key => translations[key].ar === name);
+      const service = services.find(s => s.name === name);
+      return {
+        name: translationKey ? t(translationKey) : (service ? service.name : name),
+        value: Math.round((count / total) * 100)
+      };
+    });
+  }, [patients, t, services]);
 
   const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -272,6 +302,20 @@ export default function App() {
     }
     refreshData();
   }, [dashboardFilters]);
+
+  useEffect(() => {
+    if (showCompanyPrices) {
+      fetch(`/api/company-prices/${showCompanyPrices}`)
+        .then(res => res.json())
+        .then(data => {
+          const newPrices = { ...companyPrices };
+          data.forEach((p: any) => {
+            newPrices[`${showCompanyPrices}_${p.service_id}`] = p.price;
+          });
+          setCompanyPrices(newPrices);
+        });
+    }
+  }, [showCompanyPrices]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -291,13 +335,14 @@ export default function App() {
     setLoading(true);
     try {
       const filterParams = new URLSearchParams(dashboardFilters).toString();
-      const [sRes, cRes, pRes, tRes, sessRes, invRes] = await Promise.all([
+      const [sRes, cRes, pRes, tRes, sessRes, invRes, servRes] = await Promise.all([
         fetch(`/api/stats?${filterParams}`),
         fetch(`/api/companies?${filterParams}`),
         fetch(`/api/patients?${filterParams}`),
         fetch(`/api/therapists?${filterParams}`),
         fetch(`/api/sessions?${filterParams}`),
-        fetch(`/api/invoices?${filterParams}`)
+        fetch(`/api/invoices?${filterParams}`),
+        fetch(`/api/services`)
       ]);
       setStats(await sRes.json());
       setCompanies(await cRes.json());
@@ -305,6 +350,7 @@ export default function App() {
       setTherapists(await tRes.json());
       setSessions(await sessRes.json());
       setInvoices(await invRes.json());
+      setServices(await servRes.json());
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -319,6 +365,7 @@ export default function App() {
     if (showModal === 'therapists') endpoint = '/api/therapists';
     if (showModal === 'sessions') endpoint = '/api/sessions';
     if (showModal === 'invoices') endpoint = '/api/invoices';
+    if (showModal === 'services') endpoint = '/api/services';
 
     if (editingId) {
       endpoint = `${endpoint}/${editingId}`;
@@ -333,10 +380,17 @@ export default function App() {
         body: JSON.stringify(body)
       });
       if (res.ok) {
+        const currentModal = showModal;
+        const totalSessions = formData.total_sessions;
+        
         setShowModal(null);
         setEditingId(null);
         setFormData({});
         refreshData();
+
+        if (currentModal === 'patients' && totalSessions > 1 && !editingId) {
+          setActiveTab('sessions');
+        }
       }
     } catch (err) {
       console.error(err);
@@ -345,7 +399,12 @@ export default function App() {
 
   const openEditModal = (tab: Tab, item: any) => {
     setEditingId(item.id);
-    setFormData(item);
+    let data = { ...item };
+    if (tab === 'sessions' && item.patient_id) {
+      const patient = patients.find(p => p.id === item.patient_id);
+      if (patient) data.company_id = patient.company_id;
+    }
+    setFormData(data);
     setShowModal(tab);
   };
 
@@ -359,6 +418,7 @@ export default function App() {
     if (showModal === 'therapists') endpoint = `/api/therapists/${editingId}`;
     if (showModal === 'sessions') endpoint = `/api/sessions/${editingId}`;
     if (showModal === 'invoices') endpoint = `/api/invoices/${editingId}`;
+    if (showModal === 'services') endpoint = `/api/services/${editingId}`;
 
     try {
       const res = await fetch(endpoint, { method: 'DELETE' });
@@ -449,6 +509,7 @@ export default function App() {
           <NavItem icon={<Building2 size={22} />} label={t('companies')} active={activeTab === 'companies'} onClick={() => { setActiveTab('companies'); setIsSidebarOpen(false); }} isRtl={isRtl} />
           <NavItem icon={<Users size={22} />} label={t('patients')} active={activeTab === 'patients'} onClick={() => { setActiveTab('patients'); setIsSidebarOpen(false); }} isRtl={isRtl} />
           <NavItem icon={<UserCheck size={22} />} label={t('therapists')} active={activeTab === 'therapists'} onClick={() => { setActiveTab('therapists'); setIsSidebarOpen(false); }} isRtl={isRtl} />
+          <NavItem icon={<Briefcase size={22} />} label={t('services')} active={activeTab === 'services'} onClick={() => { setActiveTab('services'); setIsSidebarOpen(false); }} isRtl={isRtl} />
           <NavItem icon={<Clock size={22} />} label={t('sessions')} active={activeTab === 'sessions'} onClick={() => { setActiveTab('sessions'); setIsSidebarOpen(false); }} isRtl={isRtl} />
           <NavItem icon={<DollarSign size={22} />} label={t('invoices')} active={activeTab === 'invoices'} onClick={() => { setActiveTab('invoices'); setIsSidebarOpen(false); }} isRtl={isRtl} />
           <NavItem icon={<CalendarIconLucide size={22} />} label={t('calendar')} active={activeTab === 'calendar'} onClick={() => { setActiveTab('calendar'); setIsSidebarOpen(false); }} isRtl={isRtl} />
@@ -620,8 +681,9 @@ export default function App() {
                     onChange={(e) => setDashboardFilters({...dashboardFilters, service_type: e.target.value})}
                   >
                     <option value="">{t('allServices')}</option>
-                    <option value="علاج طبيعي">{t('physiotherapy')}</option>
-                    <option value="تمريض منزلي">{t('nursing')}</option>
+                    {uniqueServices.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
                 </div>
                 <button 
@@ -773,6 +835,13 @@ export default function App() {
                       </div>
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => setShowCompanyPrices(company.id)}
+                              className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
+                              title={t('companyPrices')}
+                            >
+                              <DollarSign size={16} />
+                            </button>
                             <button 
                               onClick={() => openEditModal('companies', company)}
                               className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
@@ -950,6 +1019,57 @@ export default function App() {
                     <div className="pt-6 border-t border-gray-50">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('sessionsPerformed')}</p>
                       <p className="font-black text-lg text-indigo-600">{therapist.session_count}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'services' && (
+            <motion.div 
+              key="services"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-black">{t('services')}</h3>
+                <button onClick={() => setShowModal('services')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                  <Plus size={20} />
+                  <span>{t('addService')}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {services.map((service) => (
+                  <div key={service.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <Briefcase size={28} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => openEditModal('services', service)}
+                          className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                        >
+                          <FileText size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteDirect('services', service.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    </div>
+                    <h4 className="font-black text-2xl mb-2 text-gray-900">{service.name}</h4>
+                    <p className="text-sm font-medium text-gray-500 mb-6 line-clamp-2">{service.description}</p>
+                    <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('basePrice')}</p>
+                        <p className="font-black text-lg text-indigo-600">{service.base_price} {settings.currency}</p>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1419,6 +1539,72 @@ export default function App() {
 
       {/* Modals Container */}
       <AnimatePresence>
+        {showCompanyPrices && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCompanyPrices(null)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-xl md:text-2xl font-black text-gray-900">{t('companyPrices')}</h3>
+                  <p className="text-sm font-bold text-indigo-500 mt-1">{companies.find(c => c.id === showCompanyPrices)?.name}</p>
+                </div>
+                <button onClick={() => setShowCompanyPrices(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="space-y-4">
+                {services.map(service => {
+                  const currentPrice = companyPrices[`${showCompanyPrices}_${service.id}`] ?? service.base_price;
+                  return (
+                    <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div>
+                        <p className="font-black text-gray-900">{service.name}</p>
+                        <p className="text-xs font-bold text-gray-400">{t('basePrice')}: {service.base_price} {settings.currency}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="number"
+                          className="w-24 bg-white border border-gray-200 rounded-xl p-2 text-center font-black outline-none focus:ring-2 focus:ring-indigo-500"
+                          value={currentPrice}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setCompanyPrices({ ...companyPrices, [`${showCompanyPrices}_${service.id}`]: val });
+                          }}
+                        />
+                        <button 
+                          onClick={async () => {
+                            const price = companyPrices[`${showCompanyPrices}_${service.id}`] ?? service.base_price;
+                            await fetch('/api/company-prices', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ company_id: showCompanyPrices, service_id: service.id, price })
+                            });
+                            alert(t('saveData'));
+                          }}
+                          className="bg-emerald-500 text-white p-2 rounded-xl hover:bg-emerald-600 transition-all"
+                        >
+                          <CheckCircle2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
             <motion.div 
@@ -1479,7 +1665,24 @@ export default function App() {
                       <select 
                         className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
                         value={formData.company_id}
-                        onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                        onChange={async (e) => {
+                          const companyId = e.target.value;
+                          let price = formData.price_per_session;
+                          
+                          if (companyId && formData.service_type) {
+                            const service = services.find(s => s.name === formData.service_type);
+                            if (service) {
+                              try {
+                                const res = await fetch(`/api/company-prices/${companyId}`);
+                                const prices = await res.json();
+                                const specificPrice = prices.find((p: any) => p.service_id === service.id);
+                                price = specificPrice ? specificPrice.price : service.base_price;
+                              } catch (e) { console.error(e); }
+                            }
+                          }
+                          
+                          setFormData({...formData, company_id: companyId, price_per_session: price});
+                        }}
                         required
                       >
                         <option value="">{t('selectCompany')}</option>
@@ -1498,7 +1701,42 @@ export default function App() {
                         {therapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
                     </div>
-                    <FormField label={t('serviceType')} value={formData.service_type} onChange={(v) => setFormData({...formData, service_type: v})} required />
+                    <div className="space-y-2">
+                      <label className="text-sm font-black text-gray-700">{t('serviceType')}</label>
+                      <div className="relative">
+                        <input 
+                          list="services-list"
+                          className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                          value={formData.service_type || ''}
+                          onChange={async (e) => {
+                            const val = e.target.value;
+                            const service = services.find(s => s.name === val);
+                            let price = service ? service.base_price : formData.price_per_session;
+                            
+                            if (formData.company_id && service) {
+                              try {
+                                const res = await fetch(`/api/company-prices/${formData.company_id}`);
+                                const prices = await res.json();
+                                const specificPrice = prices.find((p: any) => p.service_id === service.id);
+                                if (specificPrice) price = specificPrice.price;
+                              } catch (e) { console.error(e); }
+                            }
+
+                            setFormData({
+                              ...formData, 
+                              service_type: val,
+                              price_per_session: price
+                            });
+                          }}
+                          required
+                        />
+                        <datalist id="services-list">
+                          {uniqueServices.map(s => (
+                            <option key={s} value={s} />
+                          ))}
+                        </datalist>
+                      </div>
+                    </div>
                     <FormField label={t('sessionsCount')} type="number" value={formData.total_sessions} onChange={(v) => setFormData({...formData, total_sessions: v})} required />
                     <FormField label={t('pricePerSession')} type="number" value={formData.price_per_session} onChange={(v) => setFormData({...formData, price_per_session: v})} required />
                     <FormField label={t('startDate')} type="date" value={formData.start_date} onChange={(v) => setFormData({...formData, start_date: v})} required />
@@ -1529,18 +1767,50 @@ export default function App() {
                   </div>
                 )}
 
+                {showModal === 'services' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField label={t('serviceName')} value={formData.name} onChange={(v) => setFormData({...formData, name: v})} required />
+                    <FormField label={t('basePrice')} type="number" value={formData.base_price} onChange={(v) => setFormData({...formData, base_price: v})} required />
+                    <div className="md:col-span-2">
+                      <FormField label={t('description')} value={formData.description} onChange={(v) => setFormData({...formData, description: v})} />
+                    </div>
+                  </div>
+                )}
+
                 {showModal === 'sessions' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-black text-gray-700">{t('company')}</label>
+                      <select 
+                        className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
+                        value={formData.company_id || ''}
+                        onChange={(e) => setFormData({...formData, company_id: e.target.value, patient_id: ''})}
+                      >
+                        <option value="">{t('allCompanies')}</option>
+                        {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
                     <div className="space-y-2">
                       <label className="text-sm font-black text-gray-700">{t('patient')}</label>
                       <select 
                         className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
-                        value={formData.patient_id}
-                        onChange={(e) => setFormData({...formData, patient_id: e.target.value})}
+                        value={formData.patient_id || ''}
+                        onChange={(e) => {
+                          const p = patients.find(p => p.id.toString() === e.target.value);
+                          setFormData({
+                            ...formData, 
+                            patient_id: e.target.value,
+                            therapist_id: p?.therapist_id || formData.therapist_id,
+                            company_id: p?.company_id || formData.company_id
+                          });
+                        }}
                         required
                       >
                         <option value="">{t('selectPatient')}</option>
-                        {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {patients
+                          .filter(p => !formData.company_id || p.company_id.toString() === formData.company_id.toString())
+                          .map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                        }
                       </select>
                     </div>
                     <div className="space-y-2">
