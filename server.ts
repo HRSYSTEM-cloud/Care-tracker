@@ -31,6 +31,39 @@ async function startServer() {
     const { default: Database } = await import("better-sqlite3");
     db = new Database("care_tracker.db");
     db.pragma('foreign_keys = ON');
+    
+    // Migration: Update companies table constraint if needed
+    try {
+      const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE name='companies'").get();
+      if (tableInfo && !tableInfo.sql.includes("'weekly'")) {
+        console.log("Migrating companies table to include 'weekly' billing method...");
+        db.transaction(() => {
+          db.prepare("ALTER TABLE companies RENAME TO companies_old").run();
+          db.prepare(`
+            CREATE TABLE companies (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              contact_person TEXT,
+              phone TEXT,
+              email TEXT,
+              address TEXT,
+              billing_method TEXT CHECK(billing_method IN ('monthly', 'weekly', 'completed')),
+              notes TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+          `).run();
+          db.prepare(`
+            INSERT INTO companies (id, name, contact_person, phone, email, address, billing_method, notes, created_at)
+            SELECT id, name, contact_person, phone, email, address, billing_method, notes, created_at FROM companies_old
+          `).run();
+          db.prepare("DROP TABLE companies_old").run();
+        })();
+        console.log("Migration successful.");
+      }
+    } catch (migrateError) {
+      console.error("Migration failed:", migrateError);
+    }
+
     db.exec(`
       CREATE TABLE IF NOT EXISTS companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
