@@ -119,7 +119,15 @@ const translations: Translation = {
   paymentReminder: { ar: 'تذكير بالدفع', en: 'Payment Reminder' },
   weeklyReminderDesc: { ar: 'موعد تحصيل الدفعات الأسبوعية (كل يوم أحد)', en: 'Weekly payments collection (Every Sunday)' },
   monthlyReminderDesc: { ar: 'موعد تحصيل الدفعات الشهرية (نهاية الشهر)', en: 'Monthly payments collection (End of Month)' },
-  viewAllAlerts: { ar: 'عرض كل التنبيهات', en: 'View all alerts' },
+  financialOverview: { ar: 'نظرة مالية', en: 'Financial Overview' },
+  revenueByCompany: { ar: 'الدخل حسب الشركة', en: 'Revenue by Company' },
+  sessionsByService: { ar: 'الجلسات حسب الخدمة', en: 'Sessions by Service' },
+  reportSummary: { ar: 'ملخص التقرير', en: 'Report Summary' },
+  totalAmount: { ar: 'المبلغ الإجمالي', en: 'Total Amount' },
+  paidAmount: { ar: 'المبلغ المدفوع', en: 'Paid Amount' },
+  remainingAmount: { ar: 'المبلغ المتبقي', en: 'Remaining Amount' },
+  generateReport: { ar: 'توليد التقرير', en: 'Generate Report' },
+  noDataFound: { ar: 'لا توجد بيانات', en: 'No data found' },
   service: { ar: 'الخدمة', en: 'Service' },
   allCompanies: { ar: 'كل الشركات', en: 'All Companies' },
   allServices: { ar: 'كل الخدمات', en: 'All Services' },
@@ -138,8 +146,6 @@ const translations: Translation = {
   sessionsPerformed: { ar: 'الجلسات المنجزة', en: 'Sessions Performed' },
   id: { ar: 'المعرف', en: 'ID' },
   period: { ar: 'الفترة', en: 'Period' },
-  totalAmount: { ar: 'المبلغ الإجمالي', en: 'Total Amount' },
-  paidAmount: { ar: 'المبلغ المدفوع', en: 'Paid' },
   excel: { ar: 'إكسل', en: 'Excel' },
   pdf: { ar: 'بي دي إف', en: 'PDF' },
   month: { ar: 'الشهر', en: 'Month' },
@@ -798,6 +804,59 @@ export default function App() {
                 <StatCard icon={<DollarSign />} label={t('monthlyRevenue')} value={`${(stats?.monthlyRevenue || 0).toLocaleString()} ر.س`} color="purple" />
                 <StatCard icon={<AlertCircle />} label={t('outstandingBalance')} value={`${(stats?.outstandingBalance || 0).toLocaleString()} ر.س`} color="red" />
                 <StatCard icon={<TrendingUp />} label={t('sessions')} value={sessions.length} color="cyan" />
+              </div>
+
+              {/* Financial Overview Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-center mb-8">
+                    <h3 className="text-xl font-black">{t('revenueByCompany')}</h3>
+                    <TrendingUp className="text-emerald-500" size={24} />
+                  </div>
+                  <div className="space-y-6">
+                    {companies.slice(0, 5).map((company, index) => {
+                      const revenue = invoices.filter(i => i.company_id === company.id).reduce((sum, i) => sum + i.total_amount, 0);
+                      const maxRevenue = Math.max(...companies.map(c => invoices.filter(i => i.company_id === c.id).reduce((sum, i) => sum + i.total_amount, 0)), 1);
+                      const percentage = (revenue / maxRevenue) * 100;
+                      
+                      return (
+                        <div key={company.id} className="space-y-2">
+                          <div className="flex justify-between text-sm font-bold">
+                            <span className="text-gray-700">{company.name}</span>
+                            <span className="text-indigo-600">{revenue.toLocaleString()} {settings.currency}</span>
+                          </div>
+                          <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 1, delay: index * 0.1 }}
+                              className="h-full bg-indigo-500 rounded-full"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                  <div className="flex justify-between items-center mb-8">
+                    <h3 className="text-xl font-black">{t('sessionsByService')}</h3>
+                    <TrendingUp className="text-indigo-500" size={24} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {serviceDistribution.map((item, index) => (
+                      <div key={item.name} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="text-xs font-black text-gray-400 uppercase tracking-widest truncate">{item.name}</span>
+                        </div>
+                        <p className="text-xl font-black text-gray-900">{item.value}</p>
+                        <p className="text-[10px] font-bold text-gray-400">{((item.value / sessions.length) * 100).toFixed(1)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Charts Row */}
