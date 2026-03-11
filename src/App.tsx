@@ -586,12 +586,12 @@ export default function App() {
       )}>
         <div className="p-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100">
+            <div className="w-12 h-12 bg-gradient-to-br from-violet-600 to-purple-800 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-violet-100">
               <Stethoscope size={28} />
             </div>
             <div>
               <h1 className="text-xl font-black text-gray-900 tracking-tighter">{settings.clinicName}</h1>
-              <p className="text-[10px] font-black text-indigo-600 tracking-[0.2em] uppercase">{t('clinicManagement')}</p>
+              <p className="text-[10px] font-black text-violet-600 tracking-[0.2em] uppercase">{t('clinicManagement')}</p>
             </div>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-gray-400 hover:text-gray-900">
@@ -768,7 +768,7 @@ export default function App() {
                 <div className="flex-1 min-w-[150px] space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('companies')}</label>
                   <select 
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500"
                     onChange={(e) => setDashboardFilters({...dashboardFilters, company_id: e.target.value})}
                   >
                     <option value="">{t('allCompanies')}</option>
@@ -778,7 +778,7 @@ export default function App() {
                 <div className="flex-1 min-w-[150px] space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('service')}</label>
                   <select 
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold outline-none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500"
                     onChange={(e) => setDashboardFilters({...dashboardFilters, service_type: e.target.value})}
                   >
                     <option value="">{t('allServices')}</option>
@@ -798,7 +798,7 @@ export default function App() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard icon={<Building2 />} label={t('totalCompanies')} value={stats?.totalCompanies || 0} color="blue" />
                 <StatCard icon={<Users />} label={t('totalPatients')} value={stats?.totalPatients || 0} color="emerald" />
-                <StatCard icon={<UserCheck />} label={t('totalTherapists')} value={stats?.totalTherapists || 0} color="indigo" />
+                <StatCard icon={<UserCheck />} label={t('totalTherapists')} value={stats?.totalTherapists || 0} color="violet" />
                 <StatCard icon={<CheckCircle2 />} label={t('completedSessions')} value={stats?.totalSessionsCompleted || 0} color="orange" />
                 <StatCard icon={<Clock />} label={t('remainingSessions')} value={stats?.remainingSessions || 0} color="amber" />
                 <StatCard icon={<DollarSign />} label={t('monthlyRevenue')} value={`${(stats?.monthlyRevenue || 0).toLocaleString()} ر.س`} color="purple" />
@@ -823,14 +823,14 @@ export default function App() {
                         <div key={company.id} className="space-y-2">
                           <div className="flex justify-between text-sm font-bold">
                             <span className="text-gray-700">{company.name}</span>
-                            <span className="text-indigo-600">{revenue.toLocaleString()} {settings.currency}</span>
+                            <span className="text-violet-700">{revenue.toLocaleString()} {settings.currency}</span>
                           </div>
                           <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
                             <motion.div 
                               initial={{ width: 0 }}
                               animate={{ width: `${percentage}%` }}
                               transition={{ duration: 1, delay: index * 0.1 }}
-                              className="h-full bg-indigo-500 rounded-full"
+                              className="h-full bg-violet-600 rounded-full"
                             />
                           </div>
                         </div>
@@ -842,7 +842,7 @@ export default function App() {
                 <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                   <div className="flex justify-between items-center mb-8">
                     <h3 className="text-xl font-black">{t('sessionsByService')}</h3>
-                    <TrendingUp className="text-indigo-500" size={24} />
+                    <TrendingUp className="text-violet-600" size={24} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {serviceDistribution.map((item, index) => (
@@ -929,7 +929,7 @@ export default function App() {
               <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
                 <div className="flex justify-between items-center mb-8">
                   <h3 className="text-xl font-black">{t('recentSessions')}</h3>
-                  <button onClick={() => setActiveTab('sessions')} className="text-indigo-600 text-sm font-bold hover:underline">{t('viewAll')}</button>
+                  <button onClick={() => setActiveTab('sessions')} className="text-violet-700 text-sm font-bold hover:underline">{t('viewAll')}</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-right">
@@ -949,7 +949,7 @@ export default function App() {
                           <td className="py-5 pr-4">{session.patient_name}</td>
                           <td className="py-5 text-gray-500">{session.company_name}</td>
                           <td className="py-5">
-                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px]">{session.service_type}</span>
+                            <span className="px-3 py-1 bg-violet-50 text-violet-700 rounded-full text-[10px]">{session.service_type}</span>
                           </td>
                           <td className="py-5 text-gray-500">{session.therapist_name}</td>
                           <td className="py-5 text-gray-400">{session.session_date}</td>
@@ -1043,7 +1043,7 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-50">
                         <div>
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('patients')}</p>
-                          <p className="font-black text-lg text-indigo-600">{company.patient_count}</p>
+                          <p className="font-black text-lg text-violet-700">{company.patient_count}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('outstanding')}</p>
@@ -1066,7 +1066,7 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('patients')}</h3>
-                <button onClick={() => setShowModal('patients')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={() => setShowModal('patients')} className="flex items-center gap-2 bg-violet-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-violet-100 hover:bg-violet-800 transition-all">
                   <Plus size={20} />
                   <span>{t('addPatient')}</span>
                 </button>
@@ -1091,7 +1091,7 @@ export default function App() {
                         <tr key={patient.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                           <td className="py-6 pr-8">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                              <div className="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center text-violet-700">
                                 <User size={20} />
                               </div>
                               <span className="text-gray-900">{patient.name}</span>
@@ -1107,7 +1107,7 @@ export default function App() {
                               <span className="text-xs text-gray-400">{patient.completed_sessions} / {patient.total_sessions}</span>
                               <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                 <div 
-                                  className="h-full bg-indigo-500" 
+                                  className="h-full bg-violet-600" 
                                   style={{ width: `${(patient.completed_sessions / patient.total_sessions) * 100}%` }}
                                 ></div>
                               </div>
@@ -1150,7 +1150,7 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('therapists')}</h3>
-                <button onClick={() => setShowModal('therapists')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={() => setShowModal('therapists')} className="flex items-center gap-2 bg-violet-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-violet-100 hover:bg-violet-800 transition-all">
                   <Plus size={20} />
                   <span>{t('addTherapist')}</span>
                 </button>
@@ -1160,13 +1160,13 @@ export default function App() {
                 {therapists.map((therapist) => (
                   <div key={therapist.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
                     <div className="flex justify-between items-start mb-6">
-                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center text-violet-700 group-hover:bg-violet-700 group-hover:text-white transition-colors">
                         <ShieldCheck size={28} />
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => openEditModal('therapists', therapist)}
-                          className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                          className="p-2 text-gray-400 hover:text-violet-700 transition-colors"
                         >
                           <FileText size={18} />
                         </button>
@@ -1179,7 +1179,7 @@ export default function App() {
                       </div>
                     </div>
                     <h4 className="font-black text-2xl mb-2 text-gray-900">{therapist.name}</h4>
-                    <p className="text-sm font-bold text-indigo-500 mb-6">{therapist.specialty}</p>
+                    <p className="text-sm font-bold text-violet-600 mb-6">{therapist.specialty}</p>
                     <div className="space-y-3 mb-8">
                       <div className="flex items-center gap-3 text-gray-500">
                         <Phone size={16} />
@@ -1188,7 +1188,7 @@ export default function App() {
                     </div>
                     <div className="pt-6 border-t border-gray-50">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('sessionsPerformed')}</p>
-                      <p className="font-black text-lg text-indigo-600">{therapist.session_count}</p>
+                      <p className="font-black text-lg text-violet-700">{therapist.session_count}</p>
                     </div>
                   </div>
                 ))}
@@ -1205,7 +1205,7 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('services')}</h3>
-                <button onClick={() => setShowModal('services')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={() => setShowModal('services')} className="flex items-center gap-2 bg-violet-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-violet-100 hover:bg-violet-800 transition-all">
                   <Plus size={20} />
                   <span>{t('addService')}</span>
                 </button>
@@ -1215,13 +1215,13 @@ export default function App() {
                 {services.map((service) => (
                   <div key={service.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
                     <div className="flex justify-between items-start mb-6">
-                      <div className="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <div className="w-14 h-14 bg-violet-50 rounded-2xl flex items-center justify-center text-violet-700 group-hover:bg-violet-700 group-hover:text-white transition-colors">
                         <Briefcase size={28} />
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => openEditModal('services', service)}
-                          className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                          className="p-2 text-gray-400 hover:text-violet-700 transition-colors"
                         >
                           <FileText size={18} />
                         </button>
@@ -1238,7 +1238,7 @@ export default function App() {
                     <div className="pt-6 border-t border-gray-50 flex justify-between items-center">
                       <div>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('basePrice')}</p>
-                        <p className="font-black text-lg text-indigo-600">{service.base_price} {settings.currency}</p>
+                        <p className="font-black text-lg text-violet-700">{service.base_price} {settings.currency}</p>
                       </div>
                     </div>
                   </div>
@@ -1256,7 +1256,7 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('sessions')}</h3>
-                <button onClick={() => setShowModal('sessions')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={() => setShowModal('sessions')} className="flex items-center gap-2 bg-violet-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-violet-100 hover:bg-violet-800 transition-all">
                   <Plus size={20} />
                   <span>{t('addSession')}</span>
                 </button>
@@ -1323,7 +1323,7 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('invoices')}</h3>
-                <button onClick={() => { setFormData({ month: 3, year: 2026 }); setShowModal('invoices'); }} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={() => { setFormData({ month: 3, year: 2026 }); setShowModal('invoices'); }} className="flex items-center gap-2 bg-violet-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-violet-100 hover:bg-violet-800 transition-all">
                   <Plus size={20} />
                   <span>{t('generateInvoice')}</span>
                 </button>
@@ -2149,20 +2149,20 @@ function NavItem({ icon, label, active, onClick, isRtl }: { icon: React.ReactNod
       className={cn(
         "flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300 group w-full relative overflow-hidden",
         active 
-          ? "bg-indigo-600 text-white shadow-xl shadow-indigo-100" 
-          : "text-gray-400 hover:bg-indigo-50/50 hover:text-indigo-600",
+          ? "bg-violet-700 text-white shadow-xl shadow-violet-100" 
+          : "text-gray-400 hover:bg-violet-50/50 hover:text-violet-700",
         active && (isRtl ? "md:-translate-x-2" : "md:translate-x-2")
       )}
     >
       {active && (
         <motion.div 
           layoutId="nav-active-bg"
-          className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-600"
+          className="absolute inset-0 bg-gradient-to-r from-violet-700 to-purple-900"
         />
       )}
       <span className={cn(
         "transition-colors relative z-10",
-        active ? "text-white" : "text-gray-400 group-hover:text-indigo-600"
+        active ? "text-white" : "text-gray-400 group-hover:text-violet-700"
       )}>{icon}</span>
       <span className="font-black text-sm tracking-tight relative z-10">{label}</span>
     </button>
@@ -2188,7 +2188,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
   const colorMap: Record<string, { bg: string, text: string, shadow: string, border: string, cardBg: string }> = {
     blue: { bg: 'bg-blue-500', text: 'text-blue-600', shadow: 'shadow-blue-100', border: 'border-blue-100', cardBg: 'bg-blue-50/30' },
     emerald: { bg: 'bg-emerald-500', text: 'text-emerald-600', shadow: 'shadow-emerald-100', border: 'border-emerald-100', cardBg: 'bg-emerald-50/30' },
-    indigo: { bg: 'bg-indigo-500', text: 'text-indigo-600', shadow: 'shadow-indigo-100', border: 'border-indigo-100', cardBg: 'bg-indigo-50/30' },
+    violet: { bg: 'bg-violet-600', text: 'text-violet-700', shadow: 'shadow-violet-100', border: 'border-violet-100', cardBg: 'bg-violet-50/30' },
     orange: { bg: 'bg-orange-500', text: 'text-orange-600', shadow: 'shadow-orange-100', border: 'border-orange-100', cardBg: 'bg-orange-50/30' },
     amber: { bg: 'bg-amber-500', text: 'text-amber-600', shadow: 'shadow-amber-100', border: 'border-amber-100', cardBg: 'bg-amber-50/30' },
     purple: { bg: 'bg-purple-500', text: 'text-purple-600', shadow: 'shadow-purple-100', border: 'border-purple-100', cardBg: 'bg-purple-50/30' },
@@ -2196,7 +2196,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
     cyan: { bg: 'bg-cyan-500', text: 'text-cyan-600', shadow: 'shadow-cyan-100', border: 'border-cyan-100', cardBg: 'bg-cyan-50/30' },
   };
 
-  const c = colorMap[color] || colorMap.indigo;
+  const c = colorMap[color] || colorMap.violet;
 
   return (
     <motion.div 
