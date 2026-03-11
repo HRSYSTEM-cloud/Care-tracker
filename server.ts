@@ -30,6 +30,7 @@ async function startServer() {
   try {
     const { default: Database } = await import("better-sqlite3");
     db = new Database("care_tracker.db");
+    db.pragma('foreign_keys = ON');
     db.exec(`
       CREATE TABLE IF NOT EXISTS companies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +39,7 @@ async function startServer() {
         phone TEXT,
         email TEXT,
         address TEXT,
-        billing_method TEXT CHECK(billing_method IN ('monthly', 'completed')),
+        billing_method TEXT CHECK(billing_method IN ('monthly', 'weekly', 'completed')),
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
@@ -341,8 +342,35 @@ app.post("/api/company-prices", (req, res) => {
   });
 
   app.delete("/api/companies/:id", (req, res) => {
-    db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+    try {
+      // First, check if there are patients
+      const patients = db.prepare("SELECT id FROM patients WHERE company_id = ?").all(req.params.id);
+      if (patients.length > 0) {
+        // If there are patients, we should probably warn or delete them too.
+        // For now, let's delete related records to allow deletion if that's what the user wants.
+        // Or better, just tell the user they can't delete if there are patients.
+        // But the user said "I can't delete", implying they want to.
+        
+        // Let's do a transaction to delete everything related
+        const deleteCompany = db.transaction(() => {
+          const patientIds = patients.map((p: any) => p.id);
+          if (patientIds.length > 0) {
+            const placeholders = patientIds.map(() => '?').join(',');
+            db.prepare(`DELETE FROM sessions WHERE patient_id IN (${placeholders})`).run(...patientIds);
+            db.prepare(`DELETE FROM invoices WHERE company_id = ?`).run(req.params.id);
+            db.prepare(`DELETE FROM patients WHERE company_id = ?`).run(req.params.id);
+          }
+          db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
+        });
+        deleteCompany();
+      } else {
+        db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
+      }
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error deleting company:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   // Therapists

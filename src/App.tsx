@@ -99,6 +99,7 @@ const translations: Translation = {
   statusCompleted: { ar: 'مكتمل', en: 'Completed' },
   statusPaused: { ar: 'متوقف', en: 'Paused' },
   billingMonthly: { ar: 'شهري', en: 'Monthly' },
+  billingWeekly: { ar: 'أسبوعي', en: 'Weekly' },
   billingAfter: { ar: 'بعد الجلسات', en: 'After Sessions' },
   unpaid: { ar: 'غير مدفوع', en: 'Unpaid' },
   partiallyPaid: { ar: 'مدفوع جزئياً', en: 'Partially Paid' },
@@ -115,7 +116,9 @@ const translations: Translation = {
   new: { ar: 'جديدة', en: 'New' },
   upcomingSession: { ar: 'جلسة قادمة', en: 'Upcoming Session' },
   invoicePaid: { ar: 'فاتورة مدفوعة', en: 'Invoice Paid' },
-  balanceAlert: { ar: 'تنبيه مستحقات', en: 'Balance Alert' },
+  paymentReminder: { ar: 'تذكير بالدفع', en: 'Payment Reminder' },
+  weeklyReminderDesc: { ar: 'موعد تحصيل الدفعات الأسبوعية (كل يوم أحد)', en: 'Weekly payments collection (Every Sunday)' },
+  monthlyReminderDesc: { ar: 'موعد تحصيل الدفعات الشهرية (نهاية الشهر)', en: 'Monthly payments collection (End of Month)' },
   viewAllAlerts: { ar: 'عرض كل التنبيهات', en: 'View all alerts' },
   service: { ar: 'الخدمة', en: 'Service' },
   allCompanies: { ar: 'كل الشركات', en: 'All Companies' },
@@ -335,6 +338,52 @@ export default function App() {
     console.log("Companies state updated:", companies);
   }, [companies]);
 
+  useEffect(() => {
+    // Generate dynamic reminders
+    const today = new Date();
+    const isSunday = today.getDay() === 0;
+    const isEndOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() === today.getDate();
+    
+    const newReminders: any[] = [];
+    
+    if (isSunday) {
+      const weeklyCompanies = companies.filter(c => c.billing_method === 'weekly');
+      if (weeklyCompanies.length > 0) {
+        newReminders.push({
+          id: Date.now() + 1,
+          type: 'balance',
+          title: 'paymentReminder',
+          desc: isRtl ? `تحصيل دفعات أسبوعية لـ ${weeklyCompanies.length} شركات` : `Collect weekly payments for ${weeklyCompanies.length} companies`,
+          time: t('today'),
+          read: false
+        });
+      }
+    }
+    
+    if (isEndOfMonth) {
+      const monthlyCompanies = companies.filter(c => c.billing_method === 'monthly');
+      if (monthlyCompanies.length > 0) {
+        newReminders.push({
+          id: Date.now() + 2,
+          type: 'balance',
+          title: 'paymentReminder',
+          desc: isRtl ? `تحصيل دفعات شهرية لـ ${monthlyCompanies.length} شركات` : `Collect monthly payments for ${monthlyCompanies.length} companies`,
+          time: t('today'),
+          read: false
+        });
+      }
+    }
+    
+    if (newReminders.length > 0) {
+      setNotifications(prev => {
+        // Avoid duplicates for the same day
+        const hasTodayReminder = prev.some(n => n.title === 'paymentReminder' && n.time === t('today'));
+        if (hasTodayReminder) return prev;
+        return [...newReminders, ...prev];
+      });
+    }
+  }, [companies, isRtl, t]);
+
   const refreshData = async (retries = 3) => {
     setLoading(true);
     try {
@@ -491,9 +540,13 @@ export default function App() {
       const res = await fetch(endpoint, { method: 'DELETE' });
       if (res.ok) {
         refreshData();
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Failed to delete' }));
+        alert(isRtl ? `خطأ: ${errorData.error}` : `Error: ${errorData.error}`);
       }
     } catch (err) {
       console.error(err);
+      alert(isRtl ? 'خطأ في الاتصال' : 'Connection error');
     }
   };
 
@@ -911,7 +964,9 @@ export default function App() {
                               </button>
                             </div>
                             <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-black uppercase tracking-widest">
-                              {company.billing_method === 'monthly' ? t('billingMonthly') : t('billingAfter')}
+                              {company.billing_method === 'monthly' ? t('billingMonthly') : 
+                               company.billing_method === 'weekly' ? t('billingWeekly') : 
+                               t('billingAfter')}
                             </span>
                           </div>
                       </div>
@@ -1717,6 +1772,7 @@ export default function App() {
                       >
                         <option value="">{t('selectMethod')}</option>
                         <option value="monthly">{t('billingMonthly')}</option>
+                        <option value="weekly">{t('billingWeekly')}</option>
                         <option value="completed">{t('billingAfter')}</option>
                       </select>
                     </div>
