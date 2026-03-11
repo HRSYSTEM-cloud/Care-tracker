@@ -331,28 +331,49 @@ export default function App() {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  const refreshData = async () => {
+  useEffect(() => {
+    console.log("Companies state updated:", companies);
+  }, [companies]);
+
+  const refreshData = async (retries = 3) => {
     setLoading(true);
     try {
       const filterParams = new URLSearchParams(dashboardFilters).toString();
-      const [sRes, cRes, pRes, tRes, sessRes, invRes, servRes] = await Promise.all([
-        fetch(`/api/stats?${filterParams}`),
-        fetch(`/api/companies?${filterParams}`),
-        fetch(`/api/patients?${filterParams}`),
-        fetch(`/api/therapists?${filterParams}`),
-        fetch(`/api/sessions?${filterParams}`),
-        fetch(`/api/invoices?${filterParams}`),
-        fetch(`/api/services`)
-      ]);
-      setStats(await sRes.json());
-      setCompanies(await cRes.json());
-      setPatients(await pRes.json());
-      setTherapists(await tRes.json());
-      setSessions(await sessRes.json());
-      setInvoices(await invRes.json());
-      setServices(await servRes.json());
-    } catch (e) { console.error(e); }
-    setLoading(false);
+      const endpoints = [
+        { key: 'stats', url: `/api/stats?${filterParams}` },
+        { key: 'companies', url: `/api/companies` },
+        { key: 'patients', url: `/api/patients?${filterParams}` },
+        { key: 'therapists', url: `/api/therapists` },
+        { key: 'sessions', url: `/api/sessions?${filterParams}` },
+        { key: 'invoices', url: `/api/invoices?${filterParams}` },
+        { key: 'services', url: `/api/services` }
+      ];
+
+      const results = await Promise.all(
+        endpoints.map(e => fetch(e.url).then(async res => {
+          if (res.status === 503 && retries > 0) {
+            // Wait a bit and retry if DB is still initializing
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetch(e.url);
+          }
+          return res;
+        }))
+      );
+      
+      const [sRes, cRes, pRes, tRes, sessRes, invRes, servRes] = results;
+      
+      if (sRes.ok) setStats(await sRes.json());
+      if (cRes.ok) setCompanies(await cRes.json());
+      if (pRes.ok) setPatients(await pRes.json());
+      if (tRes.ok) setTherapists(await tRes.json());
+      if (sessRes.ok) setSessions(await sessRes.json());
+      if (invRes.ok) setInvoices(await invRes.json());
+      if (servRes.ok) setServices(await servRes.json());
+    } catch (e) { 
+      console.error("Refresh data failed:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -367,18 +388,26 @@ export default function App() {
     if (showModal === 'invoices') endpoint = '/api/invoices';
     if (showModal === 'services') endpoint = '/api/services';
 
+    if (!endpoint) {
+      console.error("No endpoint found for modal:", showModal);
+      return;
+    }
+
     if (editingId) {
       endpoint = `${endpoint}/${editingId}`;
     } else if (showModal === 'invoices') {
       endpoint = '/api/invoices/generate';
     }
 
+    setLoading(true);
     try {
+      console.log("Submitting to:", endpoint, "Body:", body);
       const res = await fetch(endpoint, {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+      
       if (res.ok) {
         const currentModal = showModal;
         const totalSessions = formData.total_sessions;
@@ -391,9 +420,16 @@ export default function App() {
         if (currentModal === 'patients' && totalSessions > 1 && !editingId) {
           setActiveTab('sessions');
         }
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown server error' }));
+        console.error("Server error:", errorData);
+        alert(isRtl ? `خطأ: ${errorData.error || 'فشل في حفظ البيانات'}` : `Error: ${errorData.error || 'Failed to save data'}`);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Fetch error:", err);
+      alert(isRtl ? 'خطأ في الاتصال بالخادم' : 'Error connecting to server');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -826,69 +862,83 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-2xl font-black">{t('companies')}</h3>
-                <button onClick={() => setShowModal('companies')} className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button 
+                  onClick={() => {
+                    setFormData({});
+                    setEditingId(null);
+                    setShowModal('companies');
+                  }} 
+                  className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
                   <Plus size={20} />
                   <span>{t('addCompany')}</span>
                 </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {companies.map((company) => (
-                  <div key={company.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                        <Building2 size={28} />
-                      </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => setShowCompanyPrices(company.id)}
-                              className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
-                              title={t('companyPrices')}
-                            >
-                              <DollarSign size={16} />
-                            </button>
-                            <button 
-                              onClick={() => openEditModal('companies', company)}
-                              className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
-                            >
-                              <FileText size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDeleteDirect('companies', company.id)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                            >
-                              <X size={16} />
-                            </button>
-                          </div>
-                          <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-black uppercase tracking-widest">
-                            {company.billing_method === 'monthly' ? t('billingMonthly') : t('billingAfter')}
-                          </span>
-                        </div>
-                    </div>
-                    <h4 className="font-black text-2xl mb-2 text-gray-900">{company.name}</h4>
-                    <div className="space-y-3 mb-8">
-                      <div className="flex items-center gap-3 text-gray-500">
-                        <User size={16} />
-                        <span className="text-sm font-medium">{company.contact_person}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-gray-500">
-                        <Phone size={16} />
-                        <span className="text-sm font-medium" dir="ltr">{company.phone}</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-50">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('patients')}</p>
-                        <p className="font-black text-lg text-indigo-600">{company.patient_count}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('outstanding')}</p>
-                        <p className="font-black text-lg text-red-500">{(company.unpaid_balance || 0).toLocaleString()} <span className="text-[10px]">{settings.currency}</span></p>
-                      </div>
-                    </div>
+                {companies.length === 0 ? (
+                  <div className="md:col-span-2 lg:col-span-3 py-20 text-center bg-white rounded-[2.5rem] border border-dashed border-gray-200">
+                    <Building2 size={48} className="mx-auto text-gray-200 mb-4" />
+                    <p className="text-gray-400 font-bold">{isRtl ? 'لا توجد شركات مضافة' : 'No companies added'}</p>
                   </div>
-                ))}
+                ) : (
+                  companies.map((company) => (
+                    <div key={company.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                          <Building2 size={28} />
+                        </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => setShowCompanyPrices(company.id)}
+                                className="p-2 text-gray-400 hover:text-emerald-600 transition-colors"
+                                title={t('companyPrices')}
+                              >
+                                <DollarSign size={16} />
+                              </button>
+                              <button 
+                                onClick={() => openEditModal('companies', company)}
+                                className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                              >
+                                <FileText size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteDirect('companies', company.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                            <span className="px-4 py-1.5 bg-gray-100 text-gray-500 rounded-full text-[10px] font-black uppercase tracking-widest">
+                              {company.billing_method === 'monthly' ? t('billingMonthly') : t('billingAfter')}
+                            </span>
+                          </div>
+                      </div>
+                      <h4 className="font-black text-2xl mb-2 text-gray-900">{company.name}</h4>
+                      <div className="space-y-3 mb-8">
+                        <div className="flex items-center gap-3 text-gray-500">
+                          <User size={16} />
+                          <span className="text-sm font-medium">{company.contact_person}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-gray-500">
+                          <Phone size={16} />
+                          <span className="text-sm font-medium" dir="ltr">{company.phone}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-50">
+                        <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('patients')}</p>
+                          <p className="font-black text-lg text-indigo-600">{company.patient_count}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{t('outstanding')}</p>
+                          <p className="font-black text-lg text-red-500">{(company.unpaid_balance || 0).toLocaleString()} <span className="text-[10px]">{settings.currency}</span></p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </motion.div>
           )}
@@ -1623,7 +1673,11 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowModal(null)}
+              onClick={() => {
+                setShowModal(null);
+                setEditingId(null);
+                setFormData({});
+              }}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
             <motion.div 
@@ -1657,7 +1711,7 @@ export default function App() {
                       <label className="text-sm font-black text-gray-700">{t('billingMethod')}</label>
                       <select 
                         className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium"
-                        value={formData.billing_method}
+                        value={formData.billing_method || ''}
                         onChange={(e) => setFormData({...formData, billing_method: e.target.value})}
                         required
                       >
@@ -1665,6 +1719,9 @@ export default function App() {
                         <option value="monthly">{t('billingMonthly')}</option>
                         <option value="completed">{t('billingAfter')}</option>
                       </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <FormField label={t('notes')} value={formData.notes} onChange={(v) => setFormData({...formData, notes: v})} />
                     </div>
                   </div>
                 )}

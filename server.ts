@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createServer as createViteServer } from "vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,11 +165,6 @@ async function startServer() {
     res.json({ status: db ? "ok" : "db_failed", timestamp: new Date().toISOString() });
   });
 
-  // Start listening immediately to signal to the platform that we are up
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server listening on http://0.0.0.0:${PORT}`);
-  });
-
   // --- API Routes ---
 
   // Services API
@@ -294,22 +290,54 @@ app.post("/api/company-prices", (req, res) => {
   });
 
   app.post("/api/companies", (req, res) => {
+    console.log("POST /api/companies - Body:", req.body);
     const { name, contact_person, phone, email, address, billing_method, notes } = req.body;
-    const result = db.prepare(`
-      INSERT INTO companies (name, contact_person, phone, email, address, billing_method, notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(name, contact_person, phone, email, address, billing_method, notes);
-    res.json({ id: result.lastInsertRowid });
+    try {
+      if (!name) {
+        throw new Error("Company name is required");
+      }
+      const result = db.prepare(`
+        INSERT INTO companies (name, contact_person, phone, email, address, billing_method, notes) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        name.trim(), 
+        contact_person || null, 
+        phone || null, 
+        email || null, 
+        address || null, 
+        billing_method || null, 
+        notes || null
+      );
+      console.log("Company added successfully, ID:", result.lastInsertRowid);
+      res.json({ id: result.lastInsertRowid });
+    } catch (e: any) {
+      console.error("Error adding company:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.put("/api/companies/:id", (req, res) => {
     const { name, contact_person, phone, email, address, billing_method, notes } = req.body;
-    db.prepare(`
-      UPDATE companies 
-      SET name = ?, contact_person = ?, phone = ?, email = ?, address = ?, billing_method = ?, notes = ?
-      WHERE id = ?
-    `).run(name, contact_person, phone, email, address, billing_method, notes, req.params.id);
-    res.json({ success: true });
+    try {
+      db.prepare(`
+        UPDATE companies 
+        SET name = ?, contact_person = ?, phone = ?, email = ?, address = ?, billing_method = ?, notes = ?
+        WHERE id = ?
+      `).run(
+        name || null, 
+        contact_person || null, 
+        phone || null, 
+        email || null, 
+        address || null, 
+        billing_method || null, 
+        notes || null, 
+        req.params.id
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error updating company:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.delete("/api/companies/:id", (req, res) => {
@@ -329,18 +357,34 @@ app.post("/api/company-prices", (req, res) => {
 
   app.post("/api/therapists", (req, res) => {
     const { name, specialty, phone, notes } = req.body;
-    const result = db.prepare("INSERT INTO therapists (name, specialty, phone, notes) VALUES (?, ?, ?, ?)").run(name, specialty, phone, notes);
-    res.json({ id: result.lastInsertRowid });
+    try {
+      if (!name) throw new Error("Therapist name is required");
+      const result = db.prepare("INSERT INTO therapists (name, specialty, phone, notes) VALUES (?, ?, ?, ?)").run(
+        name.trim(), 
+        specialty || null, 
+        phone || null, 
+        notes || null
+      );
+      res.json({ id: result.lastInsertRowid });
+    } catch (e: any) {
+      console.error("Error adding therapist:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.put("/api/therapists/:id", (req, res) => {
     const { name, specialty, phone, notes } = req.body;
-    db.prepare(`
-      UPDATE therapists 
-      SET name = ?, specialty = ?, phone = ?, notes = ?
-      WHERE id = ?
-    `).run(name, specialty, phone, notes, req.params.id);
-    res.json({ success: true });
+    try {
+      db.prepare(`
+        UPDATE therapists 
+        SET name = ?, specialty = ?, phone = ?, notes = ?
+        WHERE id = ?
+      `).run(name, specialty, phone, notes, req.params.id);
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error updating therapist:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.delete("/api/therapists/:id", (req, res) => {
@@ -375,21 +419,55 @@ app.post("/api/company-prices", (req, res) => {
 
   app.post("/api/patients", (req, res) => {
     const { name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, notes } = req.body;
-    const result = db.prepare(`
-      INSERT INTO patients (name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, notes) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, notes);
-    res.json({ id: result.lastInsertRowid });
+    try {
+      if (!name) throw new Error("Patient name is required");
+      if (!company_id) throw new Error("Company is required");
+      if (!therapist_id) throw new Error("Therapist is required");
+
+      const result = db.prepare(`
+        INSERT INTO patients (name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, notes) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        name.trim(), 
+        company_id, 
+        therapist_id, 
+        service_type || null, 
+        total_sessions || 0, 
+        price_per_session || 0, 
+        start_date || null, 
+        notes || null
+      );
+      res.json({ id: result.lastInsertRowid });
+    } catch (e: any) {
+      console.error("Error adding patient:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.put("/api/patients/:id", (req, res) => {
     const { name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, status, notes } = req.body;
-    db.prepare(`
-      UPDATE patients 
-      SET name = ?, company_id = ?, therapist_id = ?, service_type = ?, total_sessions = ?, price_per_session = ?, start_date = ?, status = ?, notes = ?
-      WHERE id = ?
-    `).run(name, company_id, therapist_id, service_type, total_sessions, price_per_session, start_date, status, notes, req.params.id);
-    res.json({ success: true });
+    try {
+      db.prepare(`
+        UPDATE patients 
+        SET name = ?, company_id = ?, therapist_id = ?, service_type = ?, total_sessions = ?, price_per_session = ?, start_date = ?, status = ?, notes = ?
+        WHERE id = ?
+      `).run(
+        name, 
+        company_id, 
+        therapist_id, 
+        service_type, 
+        total_sessions, 
+        price_per_session, 
+        start_date, 
+        status, 
+        notes, 
+        req.params.id
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error updating patient:", e);
+      res.status(400).json({ error: e.message });
+    }
   });
 
   app.delete("/api/patients/:id", (req, res) => {
@@ -553,6 +631,15 @@ app.post("/api/company-prices", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    if (db) db.close();
+    process.exit(0);
+  });
+  process.on('SIGTERM', () => {
+    if (db) db.close();
+    process.exit(0);
+  });
 }
 
 startServer();
