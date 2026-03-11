@@ -518,7 +518,7 @@ export default function App() {
           <NavItem icon={<SettingsIcon size={22} />} label={t('settings')} active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setIsSidebarOpen(false); }} isRtl={isRtl} />
         </nav>
 
-        <div className="mt-auto space-y-4">
+        <div className="mt-auto p-6 space-y-4">
           <button 
             onClick={toggleLang}
             className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-gray-100 transition-all group"
@@ -529,6 +529,12 @@ export default function App() {
             </div>
             {isRtl ? <ChevronLeft size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
           </button>
+          
+          <div className="pt-2 text-center">
+            <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+              {isRtl ? 'صنع abdulaziz sindi' : 'Made by abdulaziz sindi'}
+            </p>
+          </div>
         </div>
       </aside>
 
@@ -1535,6 +1541,12 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <footer className="mt-12 py-8 border-t border-gray-100/50 text-center">
+          <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">
+            {isRtl ? 'صنع abdulaziz sindi' : 'Made by abdulaziz sindi'}
+          </p>
+        </footer>
       </main>
 
       {/* Modals Container */}

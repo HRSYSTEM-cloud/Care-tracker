@@ -1,145 +1,173 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
-import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("care_tracker.db");
-
-// Initialize Database with full schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS companies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    contact_person TEXT,
-    phone TEXT,
-    email TEXT,
-    address TEXT,
-    billing_method TEXT CHECK(billing_method IN ('monthly', 'completed')),
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS therapists (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    specialty TEXT,
-    phone TEXT,
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS patients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER,
-    therapist_id INTEGER,
-    name TEXT NOT NULL,
-    service_type TEXT,
-    total_sessions INTEGER NOT NULL,
-    price_per_session REAL NOT NULL,
-    start_date DATE,
-    status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'paused')),
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (company_id) REFERENCES companies(id),
-    FOREIGN KEY (therapist_id) REFERENCES therapists(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    patient_id INTEGER,
-    therapist_id INTEGER,
-    session_date DATE NOT NULL,
-    session_number INTEGER,
-    status TEXT DEFAULT 'pending' CHECK(status IN ('completed', 'pending', 'cancelled')),
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (patient_id) REFERENCES patients(id),
-    FOREIGN KEY (therapist_id) REFERENCES therapists(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS invoices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER,
-    month INTEGER,
-    year INTEGER,
-    total_sessions INTEGER DEFAULT 0,
-    total_amount REAL DEFAULT 0,
-    amount_paid REAL DEFAULT 0,
-    status TEXT DEFAULT 'unpaid' CHECK(status IN ('unpaid', 'partially_paid', 'paid')),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (company_id) REFERENCES companies(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    invoice_id INTEGER,
-    amount REAL NOT NULL,
-    payment_date DATE NOT NULL,
-    method TEXT,
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    base_price REAL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS company_service_prices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    company_id INTEGER NOT NULL,
-    service_id INTEGER NOT NULL,
-    price REAL NOT NULL,
-    UNIQUE(company_id, service_id),
-    FOREIGN KEY (company_id) REFERENCES companies(id),
-    FOREIGN KEY (service_id) REFERENCES services(id)
-  );
-
-  -- Seed Data
-  INSERT OR IGNORE INTO services (id, name, description, base_price) VALUES 
-  (1, 'علاج طبيعي', 'Physiotherapy sessions', 150),
-  (2, 'زيارة ممرضة', 'Nurse home visit', 100),
-  (3, 'زيارة طبيب', 'Doctor home visit', 300),
-  (4, 'مقدم رعاية', 'Caregiver services', 80);
-
-  INSERT OR IGNORE INTO companies (id, name, contact_person, phone, email, billing_method) VALUES 
-  (1, 'ذات قروب - That Group', 'المسؤول', '0500000001', 'thatgroup@example.com', 'monthly'),
-  (2, 'إشفاء - Ishfaa', 'المسؤول', '0500000002', 'ishfaa@example.com', 'monthly'),
-  (3, 'حكيم كير - Hakeem Care', 'المسؤول', '0500000003', 'hakeemcare@example.com', 'monthly'),
-  (4, 'نرعاكم - Naraakum', 'المسؤول', '0500000004', 'naraakum@example.com', 'monthly'),
-  (5, 'وتد - Watad', 'المسؤول', '0500000005', 'watad@example.com', 'monthly');
-
-  INSERT OR IGNORE INTO therapists (id, name, specialty, phone) VALUES 
-  (1, 'د. فهد الشمري', 'علاج طبيعي', '0560001111'),
-  (2, 'م. نورة القحطاني', 'تمريض', '0560002222');
-
-  INSERT OR IGNORE INTO patients (id, company_id, therapist_id, name, service_type, total_sessions, price_per_session, start_date) VALUES 
-  (1, 1, 1, 'محمد العتيبي', 'علاج طبيعي', 12, 150, '2024-03-01'),
-  (2, 2, 2, 'فهد السبيعي', 'زيارة ممرضة', 10, 100, '2024-03-05');
-
-  INSERT OR IGNORE INTO sessions (id, patient_id, therapist_id, session_date, session_number, status) VALUES 
-  (1, 1, 1, '2024-03-02', 1, 'completed'),
-  (2, 1, 1, '2024-03-04', 2, 'completed'),
-  (3, 2, 2, '2024-03-06', 1, 'completed');
-
-  INSERT OR IGNORE INTO invoices (id, company_id, month, year, total_sessions, total_amount, amount_paid, status) VALUES 
-  (1, 1, 3, 2024, 2, 300, 150, 'partially_paid');
-
-  INSERT OR IGNORE INTO payments (id, invoice_id, amount, payment_date, method) VALUES 
-  (1, 1, 150, '2024-03-07', 'Cash');
-`);
-
 async function startServer() {
   const app = express();
+  const PORT = 3000;
+  
   app.use(express.json());
+
+  // Start listening immediately to signal to the platform that we are up
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  });
+
+  // Initialize Database inside startServer with dynamic import
+  let db: any;
+  
+  // Middleware to check DB availability
+  app.use("/api", (req, res, next) => {
+    if (req.path === "/health") return next();
+    if (!db) return res.status(503).json({ error: "Database initializing or failed" });
+    next();
+  });
+
+  try {
+    const { default: Database } = await import("better-sqlite3");
+    db = new Database("care_tracker.db");
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS companies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        contact_person TEXT,
+        phone TEXT,
+        email TEXT,
+        address TEXT,
+        billing_method TEXT CHECK(billing_method IN ('monthly', 'completed')),
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS therapists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        specialty TEXT,
+        phone TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS patients (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        therapist_id INTEGER,
+        name TEXT NOT NULL,
+        service_type TEXT,
+        total_sessions INTEGER NOT NULL,
+        price_per_session REAL NOT NULL,
+        start_date DATE,
+        status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'paused')),
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (company_id) REFERENCES companies(id),
+        FOREIGN KEY (therapist_id) REFERENCES therapists(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        patient_id INTEGER,
+        therapist_id INTEGER,
+        session_date DATE NOT NULL,
+        session_number INTEGER,
+        status TEXT DEFAULT 'pending' CHECK(status IN ('completed', 'pending', 'cancelled')),
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patient_id) REFERENCES patients(id),
+        FOREIGN KEY (therapist_id) REFERENCES therapists(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER,
+        month INTEGER,
+        year INTEGER,
+        total_sessions INTEGER DEFAULT 0,
+        total_amount REAL DEFAULT 0,
+        amount_paid REAL DEFAULT 0,
+        status TEXT DEFAULT 'unpaid' CHECK(status IN ('unpaid', 'partially_paid', 'paid')),
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (company_id) REFERENCES companies(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        invoice_id INTEGER,
+        amount REAL NOT NULL,
+        payment_date DATE NOT NULL,
+        method TEXT,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invoice_id) REFERENCES invoices(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        base_price REAL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS company_service_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_id INTEGER NOT NULL,
+        service_id INTEGER NOT NULL,
+        price REAL NOT NULL,
+        UNIQUE(company_id, service_id),
+        FOREIGN KEY (company_id) REFERENCES companies(id),
+        FOREIGN KEY (service_id) REFERENCES services(id)
+      );
+
+      -- Seed Data
+      INSERT OR IGNORE INTO services (id, name, description, base_price) VALUES 
+      (1, 'علاج طبيعي', 'Physiotherapy sessions', 150),
+      (2, 'زيارة ممرضة', 'Nurse home visit', 100),
+      (3, 'زيارة طبيب', 'Doctor home visit', 300),
+      (4, 'مقدم رعاية', 'Caregiver services', 80);
+
+      INSERT OR IGNORE INTO companies (id, name, contact_person, phone, email, billing_method) VALUES 
+      (1, 'ذات قروب - That Group', 'المسؤول', '0500000001', 'thatgroup@example.com', 'monthly'),
+      (2, 'إشفاء - Ishfaa', 'المسؤول', '0500000002', 'ishfaa@example.com', 'monthly'),
+      (3, 'حكيم كير - Hakeem Care', 'المسؤول', '0500000003', 'hakeemcare@example.com', 'monthly'),
+      (4, 'نرعاكم - Naraakum', 'المسؤول', '0500000004', 'naraakum@example.com', 'monthly'),
+      (5, 'وتد - Watad', 'المسؤول', '0500000005', 'watad@example.com', 'monthly');
+
+      INSERT OR IGNORE INTO therapists (id, name, specialty, phone) VALUES 
+      (1, 'د. فهد الشمري', 'علاج طبيعي', '0560001111'),
+      (2, 'م. نورة القحطاني', 'تمريض', '0560002222');
+
+      INSERT OR IGNORE INTO patients (id, company_id, therapist_id, name, service_type, total_sessions, price_per_session, start_date) VALUES 
+      (1, 1, 1, 'محمد العتيبي', 'علاج طبيعي', 12, 150, '2024-03-01'),
+      (2, 2, 2, 'فهد السبيعي', 'زيارة ممرضة', 10, 100, '2024-03-05');
+
+      INSERT OR IGNORE INTO sessions (id, patient_id, therapist_id, session_date, session_number, status) VALUES 
+      (1, 1, 1, '2024-03-02', 1, 'completed'),
+      (2, 1, 1, '2024-03-04', 2, 'completed'),
+      (3, 2, 2, '2024-03-06', 1, 'completed');
+
+      INSERT OR IGNORE INTO invoices (id, company_id, month, year, total_sessions, total_amount, amount_paid, status) VALUES 
+      (1, 1, 3, 2024, 2, 300, 150, 'partially_paid');
+
+      INSERT OR IGNORE INTO payments (id, invoice_id, amount, payment_date, method) VALUES 
+      (1, 1, 150, '2024-03-07', 'Cash');
+    `);
+  } catch (e) {
+    console.error("Database initialization failed:", e);
+  }
+
+  // Health check route
+  app.get("/api/health", (req, res) => {
+    res.json({ status: db ? "ok" : "db_failed", timestamp: new Date().toISOString() });
+  });
+
+  // Start listening immediately to signal to the platform that we are up
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server listening on http://0.0.0.0:${PORT}`);
+  });
 
   // --- API Routes ---
 
@@ -510,22 +538,21 @@ app.post("/api/company-prices", (req, res) => {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (e) {
+      console.error("Vite initialization failed:", e);
+    }
   } else {
     app.use(express.static(path.join(__dirname, "dist")));
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
-
-  const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
 startServer();
