@@ -342,34 +342,41 @@ app.post("/api/company-prices", (req, res) => {
   });
 
   app.delete("/api/companies/:id", (req, res) => {
+    const company_id = req.params.id;
     try {
-      // First, check if there are patients
-      const patients = db.prepare("SELECT id FROM patients WHERE company_id = ?").all(req.params.id);
-      if (patients.length > 0) {
-        // If there are patients, we should probably warn or delete them too.
-        // For now, let's delete related records to allow deletion if that's what the user wants.
-        // Or better, just tell the user they can't delete if there are patients.
-        // But the user said "I can't delete", implying they want to.
+      const deleteTransaction = db.transaction(() => {
+        // 1. Delete payments related to company's invoices
+        db.prepare(`
+          DELETE FROM payments 
+          WHERE invoice_id IN (SELECT id FROM invoices WHERE company_id = ?)
+        `).run(company_id);
+
+        // 2. Delete invoices
+        db.prepare("DELETE FROM invoices WHERE company_id = ?").run(company_id);
+
+        // 3. Delete sessions related to company's patients
+        db.prepare(`
+          DELETE FROM sessions 
+          WHERE patient_id IN (SELECT id FROM patients WHERE company_id = ?)
+        `).run(company_id);
+
+        // 4. Delete patients
+        db.prepare("DELETE FROM patients WHERE company_id = ?").run(company_id);
+
+        // 5. Delete company service prices
+        db.prepare("DELETE FROM company_service_prices WHERE company_id = ?").run(company_id);
+
+        // 6. Finally delete the company
+        const result = db.prepare("DELETE FROM companies WHERE id = ?").run(company_id);
         
-        // Let's do a transaction to delete everything related
-        const deleteCompany = db.transaction(() => {
-          const patientIds = patients.map((p: any) => p.id);
-          if (patientIds.length > 0) {
-            const placeholders = patientIds.map(() => '?').join(',');
-            db.prepare(`DELETE FROM sessions WHERE patient_id IN (${placeholders})`).run(...patientIds);
-            db.prepare(`DELETE FROM invoices WHERE company_id = ?`).run(req.params.id);
-            db.prepare(`DELETE FROM patients WHERE company_id = ?`).run(req.params.id);
-          }
-          db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
-        });
-        deleteCompany();
-      } else {
-        db.prepare("DELETE FROM companies WHERE id = ?").run(req.params.id);
-      }
+        return result;
+      });
+
+      deleteTransaction();
       res.json({ success: true });
     } catch (e: any) {
       console.error("Error deleting company:", e);
-      res.status(400).json({ error: e.message });
+      res.status(500).json({ error: e.message });
     }
   });
 
@@ -499,8 +506,24 @@ app.post("/api/company-prices", (req, res) => {
   });
 
   app.delete("/api/patients/:id", (req, res) => {
-    db.prepare("DELETE FROM patients WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+    const patient_id = req.params.id;
+    try {
+      const deleteTransaction = db.transaction(() => {
+        // 1. Delete sessions related to this patient
+        db.prepare("DELETE FROM sessions WHERE patient_id = ?").run(patient_id);
+        
+        // 2. Delete the patient
+        const result = db.prepare("DELETE FROM patients WHERE id = ?").run(patient_id);
+        
+        return result;
+      });
+
+      deleteTransaction();
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error deleting patient:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Sessions
@@ -608,8 +631,24 @@ app.post("/api/company-prices", (req, res) => {
   });
 
   app.delete("/api/invoices/:id", (req, res) => {
-    db.prepare("DELETE FROM invoices WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
+    const invoice_id = req.params.id;
+    try {
+      const deleteTransaction = db.transaction(() => {
+        // 1. Delete payments related to this invoice
+        db.prepare("DELETE FROM payments WHERE invoice_id = ?").run(invoice_id);
+        
+        // 2. Delete the invoice
+        const result = db.prepare("DELETE FROM invoices WHERE id = ?").run(invoice_id);
+        
+        return result;
+      });
+
+      deleteTransaction();
+      res.json({ success: true });
+    } catch (e: any) {
+      console.error("Error deleting invoice:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Payments
